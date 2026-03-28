@@ -2,6 +2,20 @@ import networkx as nx
 import osmnx as ox
 import math
 
+def calculate_edge_weight(length, traffic_density=0.0, free_flow_speed=50.0):
+    """
+    Mesafe ve trafik yoğunluğuna göre ağırlık (weight) hesaplar (Süre bazlı).
+    Trafik yoğunluğu 0.0 (akıcı) ile 1.0 (durma noktası) arasındadır.
+    """
+    # Trafik yoğunluğu arttıkça hızı düşürür (minimum 1 km/h olacak şekilde)
+    effective_speed = max(1.0, free_flow_speed * (1 - traffic_density))
+    
+    # Ağırlık = Mesafe (metre) / Hız (km/h -> m/min dönüşümü yapılabilir ama oran aynı kalır)
+    # Burada direkt süreyi temsil eden bir katsayı döndürüyoruz.
+    weight = length / effective_speed
+    return weight
+
+
 def build_graph_with_disaster(place_name="Nilüfer, Bursa, Turkey", disaster_lat=None, disaster_lng=None, default_weight=1.0):
     """
     Belirtilen bölge için bir yol ağı (graph) oluşturur. Her yola varsayılan bir 'weight' atar.
@@ -11,9 +25,24 @@ def build_graph_with_disaster(place_name="Nilüfer, Bursa, Turkey", disaster_lat
     # Sadece araç yollarını çekiyoruz (drive network)
     G = ox.graph_from_place(place_name, network_type='drive')
     
-    # Her edge'e varsayılan weight atama
+    # Her edge'e mesafe ve trafik bazlı weight atama
     for u, v, key, data in G.edges(keys=True, data=True):
-        data['weight'] = default_weight
+        length = data.get('length', 1.0)
+        # Varsayılan trafik yoğunluğu (gerçek senaryoda bu veri API'den gelecektir)
+        traffic = data.get('traffic_density', 0.0) 
+        # Varsayılan hız sınırı (yoksa 50 km/h alıyoruz)
+        max_speed = data.get('maxspeed', 50)
+        
+        # maxspeed bazen liste veya string gelebilir, onu sayıya çevirelim
+        if isinstance(max_speed, list):
+            max_speed = float(max_speed[0])
+        elif isinstance(max_speed, str):
+            try:
+                max_speed = float(max_speed.split()[0])
+            except:
+                max_speed = 50.0
+        
+        data['weight'] = calculate_edge_weight(length, traffic, max_speed)
         
     print(f"Graf oluşturuldu. Node sayısı: {len(G.nodes)}, Edge sayısı: {len(G.edges)}")
     
