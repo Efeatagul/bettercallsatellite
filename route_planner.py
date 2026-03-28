@@ -16,9 +16,38 @@ def calculate_edge_weight(length, traffic_density=0.0, free_flow_speed=50.0):
     return weight
 
 
+def block_nearest_node(G, lat, lng, block_reason="Afet"):
+    """
+    Belirtilen koordinata en yakın node'u (düğümü) bulur ve ona bağlı tüm yolları 
+    'impassable' (weight=infinity) yaparak o noktayı ulaşılamaz kılar.
+    """
+    # osmnx.nearest_nodes fonksiyonu (X: longitude, Y: latitude) parametreleri alır
+    nearest_node = ox.nearest_nodes(G, X=lng, Y=lat)
+    print(f"[{block_reason}] Engellenen Koordinat: ({lat}, {lng}) -> En Yakın Node: {nearest_node}")
+    
+    closed_edges_count = 0
+    # Gelen ve giden tüm kenarları (edgeleri) kapatıyoruz
+    # u, v, key, data formatında döner
+    for u, v, key, data in G.edges(nearest_node, keys=True, data=True):
+        data['weight'] = math.inf
+        closed_edges_count += 1
+        
+    # in_edges (gelen yönler) için de aynı işlemi yapalım
+    # MultiDiGraph olduğu için yönlülük önemlidir.
+    try:
+        for u, v, key, data in G.in_edges(nearest_node, keys=True, data=True):
+            data['weight'] = math.inf
+            closed_edges_count += 1
+    except:
+        # Bazı graph tiplerinde in_edges farklı çalışabilir veya yoktur
+        pass
+        
+    print(f"Toplam {closed_edges_count} bağlantı 'impassable' (weight=infinity) yapıldı.")
+    return G, nearest_node
+
 def build_graph_with_disaster(place_name="Nilüfer, Bursa, Turkey", disaster_lat=None, disaster_lng=None, default_weight=1.0):
     """
-    Belirtilen bölge için bir yol ağı (graph) oluşturur. Her yola varsayılan bir 'weight' atar.
+    Belirtilen bölge için bir yol ağı (graph) oluşturur.
     Afet koordinatlarına en yakın node'u bulur ve o node üzerinden geçen yolları (edge'leri) 'impassable' yapar.
     """
     print(f"{place_name} için yol ağı çekiliyor...")
@@ -28,14 +57,18 @@ def build_graph_with_disaster(place_name="Nilüfer, Bursa, Turkey", disaster_lat
     # Her edge'e mesafe ve trafik bazlı weight atama
     for u, v, key, data in G.edges(keys=True, data=True):
         length = data.get('length', 1.0)
-        # Varsayılan trafik yoğunluğu (gerçek senaryoda bu veri API'den gelecektir)
+        # Varsayılan trafik yoğunluğu
         traffic = data.get('traffic_density', 0.0) 
         # Varsayılan hız sınırı (yoksa 50 km/h alıyoruz)
         max_speed = data.get('maxspeed', 50)
         
         # maxspeed bazen liste veya string gelebilir, onu sayıya çevirelim
         if isinstance(max_speed, list):
-            max_speed = float(max_speed[0])
+            # En düşük hızı alalım (güvenlik için)
+            try:
+                max_speed = min([float(str(s).split()[0]) for s in max_speed])
+            except:
+                max_speed = 50.0
         elif isinstance(max_speed, str):
             try:
                 max_speed = float(max_speed.split()[0])
@@ -46,23 +79,9 @@ def build_graph_with_disaster(place_name="Nilüfer, Bursa, Turkey", disaster_lat
         
     print(f"Graf oluşturuldu. Node sayısı: {len(G.nodes)}, Edge sayısı: {len(G.edges)}")
     
-    # Eğer afet noktası belirtilmişse, o noktaya en yakın node'un bağlandığı yolları (edgeleri) kapat
+    # Eğer afet noktası belirtilmişse, o noktayı engelle
     if disaster_lat is not None and disaster_lng is not None:
-        # osmnx.nearest_nodes fonksiyonu (X: longitude, Y: latitude) parametreleri alır
-        nearest_node = ox.nearest_nodes(G, X=disaster_lng, Y=disaster_lat)
-        print(f"Afet noktasına ({disaster_lat}, {disaster_lng}) en yakın node bulundu: {nearest_node}")
-        
-        # Bu node'a bağlı olan tüm edge'leri impassable yapalım (weight = infinity)
-        closed_edges_count = 0
-        # Gelen ve giden tüm kenarları kapatıyoruz
-        for u, v, key, data in G.edges(nearest_node, keys=True, data=True):
-            data['weight'] = math.inf
-            closed_edges_count += 1
-        for u, v, key, data in G.in_edges(nearest_node, keys=True, data=True):
-            data['weight'] = math.inf
-            closed_edges_count += 1
-            
-        print(f"Toplam {closed_edges_count} bağlantı 'impassable' (weight=infinity) yapıldı.")
+        G, _ = block_nearest_node(G, disaster_lat, disaster_lng, block_reason="Başlangıç Afet Noktası")
     
     return G
 
