@@ -153,6 +153,6 @@ def run_advanced_pipeline(pre_path, post_path):
     print("✅ AI Analizi Başarıyla Tamamlandı! Jüriye göstermek için hazırsınız.")
 
 if __name__ == "__main__":
-    # Gerçek resim yollarınızı buraya koyarak kodu execute edebilirsiniz:
+    # Gerçek resim yollarınızı buraya koyarak kdou execute edebilirsiniz:
     # run_advanced_pipeline("data/raw/afet_oncesi.jpg", "data/raw/afet_sonrasi.jpg")
     print("AI Sınıfları Kullanıma Hazır.")
