@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="tr" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teknoloji &amp; Demo — AfetAI</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@400;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- PAGE LOADER -->
+    <div class="page-loader" id="pageLoader">
+        <div class="loader-spinner"></div>
+        <div class="loader-text">Model ağırlıkları yükleniyor...</div>
+    </div>
+
+    <!-- NAVBAR -->
+    <nav class="navbar navbar-expand-lg fixed-top glass-nav py-3" id="navbar">
+        <div class="container">
+            <a class="navbar-brand text-white" href="index.html"><i class="fa-solid fa-satellite text-primary me-2"></i>AfetAI</a>
+            <button class="navbar-toggler shadow-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav"><i class="fa-solid fa-bars text-white fs-4"></i></button>
+            <div class="collapse navbar-collapse" id="mainNav">
+                <ul class="navbar-nav mx-auto mb-2 mb-lg-0 gap-lg-3">
+                    <li class="nav-item"><a class="nav-link" href="index.html">Ana Sayfa</a></li>
+                    <li class="nav-item"><a class="nav-link" href="ozet.html">Özet</a></li>
+                    <li class="nav-item"><a class="nav-link" href="girdiler.html">Girdiler</a></li>
+                    <li class="nav-item"><a class="nav-link" href="cozum.html">Çözüm</a></li>
+                    <li class="nav-item"><a class="nav-link" href="teknoloji.html">Teknoloji</a></li>
+                    <li class="nav-item"><a class="nav-link" href="simulasyon.html">Simülasyon</a></li>
+                </ul>
+                <a href="simulasyon.html" class="btn btn-primary-custom rounded-pill mt-3 mt-lg-0"><i class="fa-solid fa-play me-1"></i> Simülasyon</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- HEADER -->
+    <header class="page-header mt-5">
+        <div class="floating-orb orb-1"></div>
+        <div class="container" data-aos="fade-up">
+            <span class="badge bg-info bg-opacity-10 text-info rounded-pill px-3 py-2 mb-3">
+                <i class="fa-solid fa-microchip me-1"></i> TEKNİK ALTYAPI
+            </span>
+            <h1 class="display-4 fw-bold">Teknoloji Stack &amp; <span class="text-gradient">Canlı Demo</span></h1>
+            <p class="lead text-muted-custom mt-3">Kullanılan modeller, araçlar ve interaktif A* rota simülatörü.</p>
+        </div>
+    </header>
+
+    <!-- TEK KARTLAR -->
+    <section class="py-5">
+        <div class="container">
+            <div class="row g-4 mb-5">
+                <div class="col-md-6" data-aos="fade-up" data-aos-delay="100">
+                    <div class="glass-card p-4 h-100">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h3 class="h5 text-white mb-0">Segmentasyon Modeli</h3>
+                            <i class="fa-solid fa-brain fs-4" style="color: var(--color-purple);"></i>
+                        </div>
+                        <p class="text-muted-custom small">
+                            U-Net (ResNet-50 encoder), xBD + Hatay verisiyle eğitildi. Mixed precision (FP16) ile
+                            inference 890ms/tile. DeepLabV3+ ile karşılaştırıldığında kenar piksellerinde %7 daha hassas.
+                        </p>
+                        <div class="d-flex flex-wrap gap-2 mt-3">
+                            <span class="badge bg-secondary">PyTorch 2.1</span>
+                            <span class="badge bg-secondary">U-Net</span>
+                            <span class="badge bg-secondary">ResNet-50</span>
+                            <span class="badge bg-secondary">FP16</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6" data-aos="fade-up" data-aos-delay="200">
+                    <div class="glass-card p-4 h-100">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h3 class="h5 text-white mb-0">Rota Optimizasyonu</h3>
+                            <i class="fa-solid fa-bezier-curve fs-4 text-primary"></i>
+                        </div>
+                        <p class="text-muted-custom small">
+                            8-yönlü A* — maliyet fonksiyonu: <code class="text-primary">moveCost × (1 + risk × 10)</code>.
+                            Dijkstra'ya göre %38 az düğüm ziyaret ediyor. 2048×2048 grid'de 118ms.
+                        </p>
+                        <div class="d-flex flex-wrap gap-2 mt-3">
+                            <span class="badge bg-secondary">A* Algorithm</span>
+                            <span class="badge bg-secondary">8-connectivity</span>
+                            <span class="badge bg-secondary">Weighted graph</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CODE SNIPPET -->
+            <div data-aos="fade-up">
+                <h4 class="text-white mb-3"><i class="fa-solid fa-code me-2 text-primary"></i>Rota Hesaplama — Çekirdek Fonksiyon</h4>
+                <div class="code-block">
+                    <div class="code-block-header">
+                        <div class="code-block-dots"><span></span><span></span><span></span></div>
+                        <span>routeEngine.js</span>
+                    </div>
+                    <pre><span class="cm">// A* pathfinding — risk ağırlıklı maliyet fonksiyonu</span>
+<span class="cm">// Diagonal hareket √2 maliyetli, risk >0.9 → duvar</span>
+<span class="kw">function</span> <span class="fn">computeRoute</span>(start, end, riskMatrix) {
+  <span class="kw">const</span> openSet = [start];
+  <span class="kw">const</span> cameFrom = {}, gScore = {}, fScore = {};
+
+  <span class="cm">// Maliyet hesabı: moveCost * (1 + risk * 10)</span>
+  <span class="cm">// risk skoru U-Net segmentasyon çıktısından</span>
+  <span class="kw">for</span> (<span class="kw">const</span> neighbor <span class="kw">of</span> getNeighbors(current)) {
+    <span class="kw">const</span> risk = riskMatrix[neighbor.r][neighbor.c];
+    <span class="kw">if</span> (risk > <span class="num">0.9</span>) <span class="kw">continue</span>; <span class="cm">// geçilemez</span>
+
+    <span class="kw">const</span> moveCost = isDiagonal ? <span class="num">1.414</span> : <span class="num">1</span>;
+    <span class="kw">const</span> tentativeG = gScore[ck] + moveCost * (<span class="num">1</span> + risk * <span class="num">10</span>);
+
+    <span class="kw">if</span> (tentativeG < gScore[nk]) {
+      cameFrom[nk] = current;
+      gScore[nk] = tentativeG;
+      fScore[nk] = tentativeG + <span class="fn">manhattan</span>(neighbor, end);
+    }
+  }
+  <span class="kw">return</span> <span class="fn">reconstructPath</span>(cameFrom, end);
+}</pre>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- DEMO -->
+    <section id="demo" class="py-5 my-5" style="background: rgba(0,0,0,0.3); border-top: 1px solid rgba(255,255,255,0.05);">
+        <div class="container">
+            <div class="text-center mb-5" data-aos="fade-up">
+                <span class="badge bg-primary px-3 py-2 rounded-pill mb-3">İnteraktif Simülatör</span>
+                <h2 class="display-5 fw-bold text-white">A* Rota Simülatörü</h2>
+                <p class="text-muted-custom">40×25 grid üzerinde prosedürel afet senaryosu. Hatay bölgesi ilham alınarak oluşturuldu.</p>
+            </div>
+
+            <div data-aos="zoom-in">
+                <div class="glass-card p-2 p-md-3">
+                    <div class="d-flex justify-content-between align-items-center p-3 border-bottom border-secondary mb-2">
+                        <div class="d-flex gap-2"><span class="d-inline-block rounded-circle bg-danger" style="width:12px;height:12px;"></span><span class="d-inline-block rounded-circle bg-warning" style="width:12px;height:12px;"></span><span class="d-inline-block rounded-circle bg-success" style="width:12px;height:12px;"></span></div>
+                        <span class="text-muted-custom small font-monospace">afetai-sim v2.4</span>
+                        <div class="d-flex gap-2">
+                            <button id="btnAnalyze" class="btn btn-sm btn-outline-warning rounded-pill"><i class="fa-solid fa-magnifying-glass me-1"></i>Analiz</button>
+                            <button id="btnRoute" class="btn btn-sm btn-primary rounded-pill"><i class="fa-solid fa-route me-1"></i>Rota</button>
+                            <button id="btnReset" class="btn btn-sm btn-outline-secondary rounded-pill"><i class="fa-solid fa-rotate-right"></i></button>
+                        </div>
+                    </div>
+                    <div class="demo-canvas-wrapper w-100 position-relative">
+                        <!-- Status overlay (loading / error) -->
+                        <div class="demo-status-overlay" id="demoStatusOverlay">
+                            <i class="fa-solid fa-satellite-dish text-primary fs-1 mb-3 fa-beat-fade" id="demoStatusIcon"></i>
+                            <span class="text-muted-custom" id="demoStatusText">Uydu verisi yükleniyor...</span>
+                        </div>
+                        <canvas id="demo-canvas"></canvas>
+                    </div>
+                    <div class="d-flex flex-wrap justify-content-center gap-4 mt-3 small font-monospace">
+                        <span class="text-muted-custom"><span class="d-inline-block rounded-circle bg-success me-1" style="width:8px;height:8px;"></span>Güvenli</span>
+                        <span class="text-muted-custom"><span class="d-inline-block rounded-circle bg-danger me-1" style="width:8px;height:8px;"></span>Hasar</span>
+                        <span class="text-muted-custom"><span class="d-inline-block rounded-circle bg-info me-1" style="width:8px;height:8px;"></span>Rota</span>
+                        <span class="text-muted-custom">🏥 Üs</span>
+                        <span class="text-muted-custom">🆘 Hedef</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer class="py-5 border-top border-secondary">
+        <div class="container">
+            <div class="d-flex flex-wrap justify-content-between text-muted-custom small">
+                <span>© 2026 AfetAI — Açık kaynak proje</span>
+                <span class="font-monospace">v2.4.1-beta</span>
+            </div>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
