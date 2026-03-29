@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="tr" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Afet Paneli — AfetAI</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@400;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Leaflet -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <link rel="stylesheet" href="style.css">
+
+    <style>
+        /* ── Harita wrapper ─────────────────────────── */
+        #map-root {
+            position: relative;
+            width: 100%;
+            height: 72vh;
+            min-height: 480px;
+            border-radius: 14px;
+            overflow: hidden;
+            border: 1px solid var(--color-border);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+        }
+        #map-container {
+            width: 100%; height: 100%;
+            border-radius: 14px;
+        }
+        /* Canvas simülasyon katmanı */
+        #sim-overlay {
+            position: absolute; inset: 0;
+            pointer-events: none;
+            z-index: 500;
+            border-radius: 14px;
+        }
+        /* Leaflet attributionını karartma */
+        .leaflet-control-attribution {
+            background: rgba(6,8,26,0.75) !important;
+            color: #8892b0 !important;
+            font-size: 0.65rem !important;
+        }
+        .leaflet-control-attribution a { color: var(--color-primary) !important; }
+
+        /* ── Arama kutusu üst bindirmesi ─────────── */
+        #search-bar {
+            position: absolute;
+            top: 12px; left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            width: min(540px, calc(100% - 32px));
+        }
+        #search-input {
+            background: rgba(6,8,26,0.92);
+            border: 1px solid rgba(0,212,255,0.3);
+            color: #fff;
+            font-family: var(--font-body);
+            border-radius: 50px 0 0 50px;
+            padding: 0.6rem 1.2rem;
+            font-size: 0.9rem;
+        }
+        #search-input:focus {
+            outline: none;
+            border-color: rgba(0,212,255,0.7);
+            box-shadow: 0 0 0 3px rgba(0,212,255,0.1);
+        }
+        #search-input::placeholder { color: #8892b0; }
+        #btnSearch {
+            background: linear-gradient(45deg, #00d4ff, #0077ff);
+            border: none; color: #fff;
+            border-radius: 0 50px 50px 0;
+            padding: 0.6rem 1.4rem;
+            font-weight: 600; font-size: 0.9rem;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        #btnSearch:hover { filter: brightness(1.15); }
+
+        /* ── Sağ üst HUD bilgi kutusu ─────────────── */
+        #location-hud {
+            position: absolute;
+            top: 12px; right: 12px;
+            z-index: 1000;
+            background: rgba(6,8,26,0.88);
+            border: 1px solid var(--color-border);
+            border-radius: 10px;
+            padding: 0.55rem 0.85rem;
+            max-width: 220px;
+        }
+        #location-hud .loc-name {
+            font-size: 0.78rem; font-weight: 600; color: #fff;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        #location-hud .loc-coord {
+            font-size: 0.7rem; font-family: var(--font-mono); color: var(--color-primary);
+            margin-top: 2px;
+        }
+
+        /* ── Alt kontrol çubuğu ───────────────────── */
+        .ctrl-bar {
+            display: flex; align-items: center; gap: 0.75rem;
+            flex-wrap: wrap;
+            padding: 0.65rem 0.9rem;
+            background: rgba(0,0,0,0.3);
+            border-top: 1px solid var(--color-border);
+            border-radius: 0 0 14px 14px;
+        }
+        .mag-label { font-size: 0.78rem; color: var(--color-muted); white-space: nowrap; }
+        .mag-val   { font-family: var(--font-mono); font-weight: 800; color: var(--color-danger); font-size: 1.1rem; }
+        input[type=range].mag-slider {
+            -webkit-appearance: none; appearance: none;
+            height: 4px; border-radius: 2px; width: 100px;
+            background: linear-gradient(90deg, var(--color-success), var(--color-accent), var(--color-danger));
+            cursor: pointer;
+        }
+        input[type=range].mag-slider::-webkit-slider-thumb {
+            -webkit-appearance: none; appearance: none;
+            width: 14px; height: 14px; border-radius: 50%;
+            background: #fff; border: 2px solid var(--color-danger);
+        }
+        .status-pill {
+            flex: 1; min-width: 180px;
+            font-size: 0.78rem; font-family: var(--font-mono);
+            color: var(--color-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+
+        /* ── Renk lejantı ─────────────────────────── */
+        .legend-item { font-size: 0.75rem; font-family: var(--font-mono); color: var(--color-muted); }
+        .legend-dot  { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; }
+
+        /* ── Tablolar ─────────────────────────────── */
+        .data-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+        .data-table th, .data-table td {
+            padding: 0.35rem 0.5rem;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+            vertical-align: middle;
+        }
+        .data-table thead th { color: var(--color-muted); font-weight: 500; }
+
+        /* ── AI sonuç kartı ───────────────────────── */
+        .ai-block {
+            border-left: 3px solid var(--color-primary);
+            background: rgba(0,212,255,0.04);
+            border-radius: 0 8px 8px 0;
+            padding: 0.75rem 1rem;
+        }
+        .ai-block.warn { border-left-color: var(--color-accent); background: rgba(255,107,53,0.04); }
+        .ai-block.info { border-left-color: var(--color-success); background: rgba(0,255,136,0.04); }
+
+        /* Tip bölge işareti */
+        .hint-chip {
+            font-size: 0.7rem; padding: 2px 8px; border-radius: 20px;
+            font-family: var(--font-mono); font-weight: 600;
+        }
+
+        /* ── Model seçici modal ───────────────────────── */
+        .model-card {
+            background: rgba(16,22,47,0.7);
+            border: 1px solid var(--color-border);
+            border-radius: 10px;
+            padding: 0.75rem 1rem;
+            cursor: pointer;
+            transition: border-color 0.2s, background 0.2s;
+        }
+        .model-card:hover  { border-color: rgba(0,212,255,0.4); background: rgba(0,212,255,0.05); }
+        .model-card.active { border-color: var(--color-primary); background: rgba(0,212,255,0.08); }
+        .model-card.loading { border-color: var(--color-accent); animation: pulse-border 1s infinite; }
+        @keyframes pulse-border {
+            0%,100% { border-color: var(--color-accent); }
+            50%      { border-color: rgba(255,107,53,0.3); }
+        }
+        .model-name  { font-weight: 700; font-size: 0.88rem; color: #fff; }
+        .model-id    { font-family: var(--font-mono); font-size: 0.7rem; color: var(--color-primary); }
+        .model-meta  { font-size: 0.72rem; color: var(--color-muted); }
+        .model-badge { font-size: 0.65rem; padding: 2px 7px; border-radius: 10px; }
+
+        /* ── Gerçek deprem listesi ───────────────────── */
+        .quake-item {
+            display: flex; align-items: center; gap: 0.55rem;
+            padding: 0.42rem 0.3rem;
+            border-radius: 7px;
+            cursor: pointer;
+            transition: background 0.12s;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+        }
+        .quake-item:last-child { border-bottom: none; }
+        .quake-item:hover { background: rgba(255,255,255,0.05); }
+        .quake-item.quake-selected { background: rgba(0,212,255,0.1); border-left: 2px solid var(--color-primary); }
+        .quake-mag {
+            font-family: var(--font-mono); font-weight: 800; font-size: 0.7rem;
+            padding: 3px 6px; border-radius: 5px;
+            min-width: 44px; text-align: center; flex-shrink: 0;
+        }
+        .quake-info { flex: 1; min-width: 0; }
+        .quake-place {
+            font-size: 0.73rem; color: #e2e8f0;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .quake-meta {
+            font-size: 0.66rem; color: var(--color-muted);
+            font-family: var(--font-mono); margin-top: 1px;
+        }
+        .quake-depth {
+            font-family: var(--font-mono); font-size: 0.65rem;
+            color: var(--color-muted); flex-shrink: 0; text-align: right;
+        }
+        #quakeListBody::-webkit-scrollbar { width: 4px; }
+        #quakeListBody::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius:2px; }
+
+        /* ── Leaflet harita katmanları (zoom/pan doğru davranır) ── */
+
+        /* Toplanma alanı marker */
+        .l-ap-wrap  { background:transparent!important; border:none!important; }
+        .l-ap-dot {
+            width:28px; height:28px; border-radius:50%;
+            display:flex; align-items:center; justify-content:center;
+            font-family:var(--font-mono); font-weight:800; font-size:11px;
+            color:#0a0f1e; border:2px solid rgba(255,255,255,0.25);
+            box-shadow:0 2px 10px rgba(0,0,0,0.6);
+            position:relative;
+        }
+        .l-ap-dot.sel { animation: ap-ring 1.1s ease-in-out infinite; }
+        @keyframes ap-ring {
+            0%,100% { box-shadow:0 0 0 0 rgba(0,255,136,.7), 0 2px 10px rgba(0,0,0,.6); }
+            60%     { box-shadow:0 0 0 12px rgba(0,255,136,0), 0 2px 10px rgba(0,0,0,.6); }
+        }
+        .l-ap-lbl {
+            position:absolute; top:30px; left:50%; transform:translateX(-50%);
+            font-family:var(--font-mono); font-size:9px; white-space:nowrap;
+            text-shadow:0 1px 4px rgba(0,0,0,.9); pointer-events:none;
+        }
+
+        /* Epimerkez marker */
+        .l-epi-wrap { background:transparent!important; border:none!important; }
+        .l-epi-dot {
+            width:32px; height:32px; border-radius:50%;
+            background:rgba(255,30,60,.9);
+            display:flex; align-items:center; justify-content:center;
+            font-size:16px; box-shadow:0 0 0 3px rgba(255,30,60,.4);
+            animation: epi-pulse .9s ease-in-out infinite alternate;
+        }
+        @keyframes epi-pulse {
+            from { transform:scale(1);   box-shadow:0 0 8px  #ff1e3c; }
+            to   { transform:scale(1.35);box-shadow:0 0 24px #ff1e3c; }
+        }
+        .l-epi-mag {
+            position:absolute; top:34px; left:50%; transform:translateX(-50%);
+            font-family:var(--font-mono); font-size:10px; font-weight:800;
+            color:#ff6b6b; text-shadow:0 1px 4px rgba(0,0,0,.9);
+            white-space:nowrap; pointer-events:none;
+        }
+
+        /* Kullanıcı konumu */
+        .l-user-wrap  { background:transparent!important; border:none!important; }
+        .l-user-dot   {
+            width:14px; height:14px; border-radius:50%; background:#0099ee;
+            position:absolute; top:5px; left:5px;
+            box-shadow:0 0 12px rgba(0,150,255,.8);
+        }
+        .l-user-ring  {
+            width:24px; height:24px; border-radius:50%;
+            border:2px solid rgba(0,150,255,.55);
+            position:absolute; top:0; left:0;
+            animation: user-pulse 1.6s ease-out infinite;
+        }
+        @keyframes user-pulse {
+            0%   { transform:scale(.8); opacity:.9; }
+            100% { transform:scale(2);  opacity:0; }
+        }
+
+        /* Waypoint etiket */
+        .l-wp-wrap  { background:transparent!important; border:none!important; }
+        .l-wp-box {
+            background:rgba(6,8,26,.88);
+            border:1px solid rgba(0,212,255,.35);
+            border-radius:4px; padding:2px 6px;
+            font-family:var(--font-mono); white-space:nowrap;
+            pointer-events:none;
+        }
+        .l-wp-box.end { border-color:rgba(0,255,136,.5); }
+        .l-wp-name  { font-size:8px; color:#00d4ff; font-weight:700; }
+        .l-wp-box.end .l-wp-name { color:#00ff88; }
+        .l-wp-coord { font-size:7px; color:#8892b0; }
+
+        /* Leaflet deprem tooltip */
+        .leaflet-tooltip-dark {
+            background: rgba(6,8,26,0.92) !important;
+            border: 1px solid rgba(255,159,10,0.3) !important;
+            color: #e2e8f0 !important;
+            font-size: 0.75rem !important;
+            border-radius: 6px !important;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5) !important;
+        }
+        .leaflet-tooltip-dark::before { display: none; }
+
+        /* ── AFAD istasyon marker ─────────────────── */
+        .l-afad-wrap { background:transparent!important; border:none!important; }
+        .l-afad-dot {
+            width:28px; height:28px; border-radius:6px;
+    "            background: rgba(255,127,0,0.9);
+                display:flex; align-items:center; justify-content:center;
+                color:#fff; font-size:13px;
+                box-shadow:0 2px 10px rgba(255,127,0,0.5);
+                border:1.5px solid rgba(255,255,255,0.3);
+            }
+            .l-afad-lbl {
+                position:absolute; top:30px; left:50%; transform:translateX(-50%);
+                font-family:var(--font-mono); font-size:8px; color:#ff9f0a;
+                white-space:nowrap; text-shadow:0 1px 4px rgba(0,0,0,.9);
+                pointer-events:none; max-width:80px; overflow:hidden; text-overflow:ellipsis;
+            }
+
+            /* ── Hastane marker ──────────────────────── */
+            .l-hosp-wrap { background:transparent!important; border:none!important; }
+            .l-hosp-dot {
+                width:22px; height:22px; border-radius:50%;
+                background: rgba(0,180,255,0.9);
+                display:flex; align-items:center; justify-content:center;
+                color:#fff; font-size:14px; font-weight:900;
+                box-shadow:0 2px 8px rgba(0,180,255,0.5);
+                border:1.5px solid rgba(255,255,255,0.4);
+            }
+            .l-hosp-lbl {
+                position:absolute; top:24px; left:50%; transform:translateX(-50%);
+                font-family:var(--font-mono); font-size:8px; color:#00b4ff;
+                white-space:nowrap; text-shadow:0 1px 4px rgba(0,0,0,.9);
+                pointer-events:none; max-width:80px; overflow:hidden; text-overflow:ellipsis;
+            }
+
+            /* ── RAG Panel öğeleri ───────────────────── */
+            .rag-item {
+                display:flex; align-items:center; gap:5px;
+                padding:3px 0;
+                border-bottom:1px solid rgba(255,255,255,0.04);
+                font-size:0.7rem; color:#e2e8f0;
+            }
+            .rag-item:last-child { border-bottom:none; }
+            .rag-icon { font-size:0.8rem; flex-shrink:0; }
+            .rag-name { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+            /* ── Uydu & Yangın popup koyu tema ───────────────────── */
+            .sat-popup-dark .leaflet-popup-content-wrapper {
+                background: rgba(6,8,26,0.96) !important;
+                border: 1px solid rgba(0,212,255,0.35) !important;
+                border-radius: 12px !important;
+                box-shadow: 0 8px 32px rgba(0,0,0,0.7), 0 0 0 1px rgba(0,212,255,0.1) !important;
+                color: #e2e8f0 !important;
+            }
+            .sat-popup-dark .leaflet-popup-tip {
+                background: rgba(6,8,26,0.96) !important;
+                border-color: rgba(0,212,255,0.35) !important;
+            }
+            .sat-popup-dark .leaflet-popup-close-button {
+                color: #8892b0 !important;
+                font-size: 18px !important;
+                top: 6px !important; right: 8px !important;
+            }
+            .sat-popup-dark .leaflet-popup-close-button:hover { color: #fff !important; }
+            .fire-warning-popup .leaflet-popup-content-wrapper {
+                border-color: rgba(255,59,92,0.5) !important;
+                box-shadow: 0 8px 32px rgba(255,59,92,0.3), 0 0 20px rgba(255,59,92,0.15) !important;
+            }
+        </style>
+    </head>
+    <body>
+
+    <!-- PAGE LOADER -->
+    <div class="page-loader" id="pageLoader">
+        <div class="loader-spinner"></div>
+        <div class="loader-text">Harita katmanı yükleniyor...</div>
+    </div>
+
+    <!-- NAVBAR -->
+    <nav class="navbar navbar-expand-lg fixed-top glass-nav py-3" id="navbar">
+        <div class="container-fluid px-4">
+            <a class="navbar-brand text-white" href="index.html">
+                <i class="fa-solid fa-satellite text-primary me-2"></i>AfetAI
+            </a>
+            <button class="navbar-toggler shadow-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav">
+                <i class="fa-solid fa-bars text-white fs-4"></i>
+            </button>
+            <div class="collapse navbar-collapse" id="mainNav">
+                <ul class="navbar-nav mx-auto mb-2 mb-lg-0 gap-lg-3">
+                    <li class="nav-item"><a class="nav-link" href="index.html">Ana Sayfa</a></li>
+                    <li class="nav-item"><a class="nav-link" href="ozet.html">Özet</a></li>
+                    <li class="nav-item"><a class="nav-link" href="girdiler.html">Girdiler</a></li>
+                    <li class="nav-item"><a class="nav-link" href="cozum.html">Çözüm</a></li>
+                    <li class="nav-item"><a class="nav-link" href="teknoloji.html">Teknoloji</a></li>
+                    <li class="nav-item"><a class="nav-link active" href="simulasyon.html">Afet Paneli</a></li>
+                </ul>
+                <div class="d-flex align-items-center gap-2 mt-2 mt-lg-0">
+                    <span id="serverStatusBadge" class="badge bg-secondary font-monospace" style="font-size:0.7rem;">● Kontrol ediliyor</span>
+                    <button class="btn btn-sm rounded-pill px-3"
+                            style="background:rgba(168,85,247,0.15);border:1px solid rgba(168,85,247,0.3);color:var(--color-purple);font-size:0.78rem;"
+                            data-bs-toggle="modal" data-bs-target="#modelModal">
+                        <i class="fa-solid fa-microchip me-1"></i>
+                        <span id="navModelName">Model Seç</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- ════════ MODEL SEÇİCİ MODAL ════════ -->
+    <div class="modal fade" id="modelModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content" style="background:#0d1117;border:1px solid var(--color-border);border-radius:16px;">
+                <div class="modal-header" style="border-bottom:1px solid var(--color-border);">
+                    <div>
+                        <h5 class="modal-title text-white fw-bold mb-0">
+                            <i class="fa-solid fa-microchip text-purple me-2"></i>Model Seç
+                        </h5>
+                        <div class="small text-muted-custom mt-1">
+                            mlx-community modelleri — Apple Silicon (M1/M2/M3/M4)
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+
+                    <!-- Durum satırı -->
+                    <div id="modelStatusBar" class="d-flex align-items-center gap-2 mb-4 p-3 rounded-3"
+                        style="background:rgba(0,0,0,0.3);border:1px solid var(--color-border);">
+                        <i class="fa-solid fa-circle-notch fa-spin text-muted" id="modelStatusIcon"></i>
+                        <span id="modelStatusText" class="small font-monospace text-muted-custom">Sunucu kontrol ediliyor...</span>
+                    </div>
+
+                    <!-- Önerilen modeller -->
+                    <h6 class="text-muted-custom fw-bold mb-3" style="font-size:0.75rem;letter-spacing:1px;">ÖNERİLEN MODELLER</h6>
+                    <div id="modelList" class="row g-2 mb-4">
+                        <div class="col-12 text-muted small text-center py-3">Yükleniyor...</div>
+                    </div>
+
+                    <!-- Özel model girişi -->
+                    <h6 class="text-muted-custom fw-bold mb-2" style="font-size:0.75rem;letter-spacing:1px;">ÖZEL MODEL (HuggingFace path)</h6>
+                    <div class="d-flex gap-2">
+                        <input type="text" id="customModelInput"
+                            class="form-control form-control-sm font-monospace"
+                            style="background:rgba(0,0,0,0.4);border:1px solid var(--color-border);color:#fff;font-size:0.8rem;"
+                            placeholder="mlx-community/herhangi-bir-model-4bit">
+                        <button id="btnLoadCustom" class="btn btn-sm btn-outline-primary rounded-pill px-3 text-nowrap">
+                            <i class="fa-solid fa-download me-1"></i> Yükle
+                        </button>
+                    </div>
+                    <div class="small text-muted-custom mt-1">
+                        İlk yüklemede model HuggingFace'den indirilir (~2-40 GB).
+                    </div>
+
+                    <!-- Yüklü model bilgisi -->
+                    <div id="loadedModelInfo" class="d-none mt-4 p-3 rounded-3"
+                        style="background:rgba(0,255,136,0.06);border:1px solid rgba(0,255,136,0.2);">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="fa-solid fa-check-circle text-success"></i>
+                            <span class="text-success fw-bold small">Aktif Model:</span>
+                            <span id="loadedModelId" class="font-monospace small text-white"></span>
+                        </div>
+                        <div class="mt-2">
+                            <button id="btnUnloadModel" class="btn btn-sm btn-outline-danger rounded-pill">
+                                <i class="fa-solid fa-trash me-1"></i> Bellekten Kaldır
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ════════ ANA İÇERİK ════════ -->
+    <section class="pb-5 pt-5 mt-2">
+        <div class="container-fluid px-4">
+            <div class="row g-4">
+
+                <!-- ── Sol: Harita ── -->
+                <div class="col-xl-8" data-aos="fade-up">
+                    <div id="map-root" class="glass-card p-0">
+                        <!-- Leaflet haritası -->
+                        <div id="map-container"></div>
+                        <!-- Simülasyon canvas katmanı -->
+                        <canvas id="sim-overlay"></canvas>
+
+                        <!-- Arama çubuğu -->
+                        <div id="search-bar">
+                            <div class="d-flex shadow-lg">
+                                <input type="text" id="search-input"
+                                    placeholder="Mahalle, ilçe veya şehir adı girin... (ör: Kadıköy İstanbul)"
+                                    class="flex-grow-1">
+                                <button id="btnSearch"><i class="fa-solid fa-magnifying-glass me-1"></i> Ara</button>
+                            </div>
+                            <!-- Sonuçlar dropdown -->
+                            <div id="search-results" class="d-none mt-1 rounded-3 shadow-lg overflow-hidden"
+                                style="background:rgba(6,8,26,0.96);border:1px solid var(--color-border);">
+                            </div>
+                        </div>
+
+                        <!-- Konum HUD -->
+                        <div id="location-hud">
+                            <div class="loc-name" id="locationDisplay">Antakya, Hatay</div>
+                            <div class="loc-coord" id="coordDisplay">Y: 36.20210° | X: 36.16000°</div>
+                        </div>
+                    </div>
+
+                    <!-- Kontrol çubuğu -->
+                    <div class="ctrl-bar mt-0" style="border-radius:0 0 14px 14px; margin-top:-1px;">
+                        <span class="mag-label"><i class="fa-solid fa-wave-square me-1 text-danger"></i>Büyüklük:</span>
+                        <input type="range" id="magSlider" class="mag-slider" min="4.5" max="9.0" step="0.1" value="7.4">
+                        <span id="magDisplay" class="mag-val">M7.4</span>
+
+                        <div class="vr opacity-25 mx-1"></div>
+
+                        <button id="btnQuake" class="btn btn-sm btn-outline-danger rounded-pill px-3"
+                                title="Listedeki gerçek depremleri kullanın — bu buton manuel test içindir">
+                            <i class="fa-solid fa-flask-vial me-1"></i> Manuel Test
+                        </button>
+                        <button id="btnAIAnalyze" class="btn btn-sm btn-primary-custom rounded-pill px-3">
+                            <i class="fa-solid fa-brain me-1"></i> AI Analizi
+                        </button>
+                        <button id="btnSimReset" class="btn btn-sm btn-outline-secondary rounded-pill">
+                            <i class="fa-solid fa-rotate-right"></i>
+                        </button>
+                        <button id="btnFireLayer" class="btn btn-sm rounded-pill px-3"
+                                title="NASA FIRMS / MODIS gerçek yangın katmanı"
+                                style="background:rgba(255,59,92,0.12);border:1px solid rgba(255,59,92,0.3);color:#ff6b6b;font-size:0.78rem;">
+                            <i class="fa-solid fa-fire me-1"></i> Yangın Katmanı
+                        </button>
+
+                        <div class="vr opacity-25 mx-1 d-none d-sm-block"></div>
+                        <span class="status-pill" id="simStatus">
+                            Herhangi bir mahalleyi aratın veya haritaya tıklayarak epimerkez seçin.
+"                    </span>
+                </div>
+
+                <!-- Renk lejantı -->
+                <div class="d-flex flex-wrap gap-3 mt-2 ps-1">
+                    <span class="legend-item"><span class="legend-dot bg-danger"></span>Ağır Hasar</span>
+                    <span class="legend-item"><span class="legend-dot" style="background:#ff6414;"></span>Orta Hasar</span>
+                    <span class="legend-item"><span class="legend-dot" style="background:#f59e0b;"></span>Hafif Hasar</span>
+                    <span class="legend-item"><span class="legend-dot bg-success"></span>Toplanma Alanı</span>
+                    <span class="legend-item"><span class="legend-dot" style="background:#00aaff;"></span>Mevcut Konum</span>
+                    <span class="legend-item"><span class="legend-dot bg-info"></span>AI Rotası (XYZ)</span>
+                    <span class="legend-item"><span class="legend-dot" style="background:#ff9f0a;opacity:0.7;border-radius:50%;"></span>Gerçek Deprem</span>
+                    <span class="legend-item"><span class="legend-dot" style="background:#ff7f00;border-radius:3px;"></span>AFAD İstasyonu</span>
+                    <span class="legend-item"><span class="legend-dot" style="background:#00b4ff;"></span>Hastane</span>
+                    <span class="legend-item ms-auto text-muted small font-monospace" style="font-size:0.68rem;">
+                        Listeden seç veya haritaya tıkla
+                    </span>
+                </div>
+            </div>
+
+            <!-- ── Sağ: Paneller ── -->
+            <div class="col-xl-4">
+
+                <!-- ── Son Depremler (USGS) ── -->
+                <div class="glass-card p-3 mb-3" data-aos="fade-up">
+                    <div class="d-flex align-items-center mb-1">
+                        <i class="fa-solid fa-circle-radiation text-danger me-2"
+                           style="animation:fa-beat-fade 2s infinite;"></i>
+                        <h6 class="text-white mb-0 fw-bold">Son Depremler</h6>
+                        <div class="ms-auto d-flex gap-1 align-items-center">
+                            <select id="quakeMagFilter"
+                                class="form-select form-select-sm font-monospace"
+                                style="width:auto;font-size:0.68rem;background:rgba(0,0,0,0.5);
+                                       border-color:var(--color-border);color:#ccc;padding:2px 6px;">
+                                <option value="1.5">≥ M1.5</option>
+                                <option value="2.5" selected>≥ M2.5</option>
+                                <option value="3.0">≥ M3.0</option>
+                                <option value="4.0">≥ M4.0</option>
+                                <option value="5.0">≥ M5.0</option>
+                            </select>
+                            <button id="btnRefreshQuakes"
+                                class="btn btn-sm btn-outline-secondary rounded-circle"
+                                style="width:26px;height:26px;padding:0;line-height:1;"
+                                title="Yenile">
+                                <i class="fa-solid fa-rotate-right fa-xs"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="quakeListStatus" class="small text-muted-custom mb-1" style="font-size:0.68rem;">
+                        <i class="fa-solid fa-spinner fa-spin me-1"></i> USGS'den çekiliyor...
+                    </div>
+                    <div id="quakeListBody" style="max-height:300px;overflow-y:auto;">
+                        <!-- deprem öğeleri sim.js tarafından doldurulur -->
+                    </div>
+                </div>
+
+                <!-- ── RAG Veri Havuzu ── -->
+                <div class="glass-card p-3 mb-3" data-aos="fade-up">
+                    <div class="d-flex align-items-center mb-1">
+                        <i class="fa-solid fa-database me-2" style="color:var(--color-purple);"></i>
+                        <h6 class="text-white mb-0 fw-bold">RAG Veri Havuzu</h6>
+                        <span id="ragStatusBadge"
+                              class="badge bg-secondary ms-auto font-monospace"
+                              style="font-size:0.63rem;">MongoDB</span>
+                    </div>
+                    <div class="text-muted-custom mb-2" style="font-size:0.64rem;font-family:var(--font-mono);">
+                        Overpass API · 12 km yarıçap · 24 saat cache
+                    </div>
+                    <div class="mb-1" style="font-size:0.68rem;color:var(--color-muted);">
+                        <i class="fa-solid fa-hospital me-1" style="color:#00b4ff;"></i>Hastaneler
+                    </div>
+                    <div id="ragHospitalList" style="max-height:90px;overflow-y:auto;">
+                        <div class="text-muted small text-center py-1" style="font-size:0.68rem;">
+                            Deprem seçilince otomatik yüklenir
+                        </div>
+                    </div>
+                    <div class="mt-2 mb-1" style="font-size:0.68rem;color:var(--color-muted);">
+                        <i class="fa-solid fa-shield-halved me-1" style="color:#ff7f00;"></i>AFAD İstasyonları
+                    </div>
+                    <div id="ragAFADList" style="max-height:80px;overflow-y:auto;"></div>
+                </div>
+
+                <!-- ── Analiz Kuyruğu (M4.6+) + Kalp Atışı ── -->
+                <div class="glass-card p-3 mb-3" data-aos="fade-up" data-aos-delay="80">
+                    <div class="d-flex align-items-center mb-1">
+                        <i class="fa-solid fa-list-ol text-warning me-2"></i>
+                        <h6 class="text-white mb-0 fw-bold">Analiz Kuyruğu</h6>
+                        <span id="queueCount"
+                              class="badge bg-warning bg-opacity-20 text-warning ms-2 font-monospace"
+                              style="font-size:0.63rem;">0</span>
+                        <div class="ms-auto d-flex align-items-center gap-1">
+                            <span class="badge bg-secondary font-monospace"
+                                  style="font-size:0.63rem;" title="Sonraki otomatik analiz">
+                                <i class="fa-regular fa-clock me-1"></i><span id="heartbeatCountdown">2:30</span>
+                            </span>
+                            <button id="btnProcessNext"
+                                    class="btn btn-sm btn-outline-warning rounded-pill"
+                                    style="font-size:0.68rem;padding:2px 9px;">
+                                <i class="fa-solid fa-forward-step me-1"></i>İşle
+                            </button>
+                        </div>
+                    </div>
+                    <div class="text-muted-custom mb-1"
+                         style="font-size:0.64rem;font-family:var(--font-mono);">
+                        ≥ M4.6 · büyüklüğe göre sıralı · her 2:30 otomatik analiz
+                    </div>
+                    <div id="queueList" style="max-height:190px;overflow-y:auto;">
+                        <div class="text-muted text-center py-2 small">Yükleniyor...</div>
+                    </div>
+                </div>
+
+                <!-- Toplanma Alanları -->
+                <div class="glass-card p-3 mb-3" data-aos="fade-up" data-aos-delay="100">
+                    <div class="d-flex align-items-center mb-2">
+                        <i class="fa-solid fa-location-dot text-success me-2"></i>
+                        <h6 class="text-white mb-0 fw-bold">Toplanma Alanları</h6>
+                        <span id="apSourceBadge" class="hint-chip ms-auto"
+                              style="background:rgba(0,255,136,0.1);color:var(--color-success);">
+                            OSM verisi
+                        </span>
+                    </div>
+                    <div style="max-height: 200px; overflow-y:auto;">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>İsim</th>
+                                    <th class="text-center">Hasar</th>
+                                    <th>Kap.</th>
+                                </tr>
+                            </thead>
+                            <tbody id="apTableBody">
+                                <tr>
+                                    <td colspan="4" class="text-muted text-center py-3">
+                                        Mahalle aratıldığında OSM'den yüklenir.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- XYZ Waypoint tablosu -->
+                <div class="glass-card p-3 mb-3" data-aos="fade-up" data-aos-delay="150">
+                    <div class="d-flex align-items-center mb-2">
+                        <i class="fa-solid fa-route text-primary me-2"></i>
+                        <h6 class="text-white mb-0 fw-bold">XYZ Rota Noktaları</h6>
+                        <span class="hint-chip ms-auto"
+                              style="background:rgba(0,212,255,0.1);color:var(--color-primary);">
+                            Open-Elevation Z
+                        </span>
+                    </div>
+                    <div style="max-height: 195px; overflow-y:auto;">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Nokta</th>
+                                    <th>X (°E)</th>
+                                    <th>Y (°N)</th>
+                                    <th>Z (m)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="waypointTableBody">
+                                <tr>
+                                    <td colspan="4" class="text-muted text-center py-3 small">
+                                        AI analizi tamamlandıktan sonra görünür.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- ── AI Sonuç Paneli ────────────────────── -->
+        <div id="aiResultPanel" class="d-none mt-4" data-aos="fade-up">
+            <div class="glass-card p-4">
+                <div class="d-flex align-items-center gap-3 mb-4">
+                    <div class="icon-box icon-purple"><i class="fa-solid fa-brain"></i></div>
+                    <div>
+                        <div class="small text-muted-custom">Görüntü-Dil Modeli</div>
+                        <div class="fw-bold text-white font-monospace" style="font-size:0.85rem;">
+                            mlx-community/Qwen2.5-VL-7B-Instruct-4bit
+                        </div>
+                    </div>
+                    <span id="aiModelBadge" class="badge bg-secondary font-monospace ms-auto">—</span>
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <div class="small text-muted-custom mb-1">
+                            <i class="fa-solid fa-location-pin text-success me-1"></i>Seçilen Toplanma Alanı
+                        </div>
+                        <div class="ai-block info"><p id="aiReason" class="small mb-0 text-muted-custom">—</p></div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="small text-muted-custom mb-1">
+                            <i class="fa-solid fa-shield-halved text-warning me-1"></i>Risk Değerlendirmesi
+                        </div>
+                        <div class="ai-block warn"><p id="aiRisk" class="small mb-0 text-muted-custom">—</p></div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="small text-muted-custom mb-1">
+                            <i class="fa-solid fa-route text-info me-1"></i>Rota Notları
+                        </div>
+                        <div class="ai-block"><p id="aiRouteNotes" class="small mb-0 text-muted-custom">—</p></div>
+                        <div class="mt-2">
+                            <span id="aiRouteSrc" class="badge bg-secondary bg-opacity-20 text-secondary">—</span>
+                        </div>
+                    </div>
+                </div>
+                <!-- AFAD + Hastane satırı -->
+                <div class="row g-3 mt-1">
+                    <div class="col-md-6">
+                        <div class="small text-muted-custom mb-1">
+                            <i class="fa-solid fa-shield-halved me-1" style="color:#ff7f00;"></i>AFAD Yönlendirmesi
+                        </div>
+                        <div class="ai-block warn"><p id="aiAFADGuidance" class="small mb-0 text-muted-custom">—</p></div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="small text-muted-custom mb-1">
+                            <i class="fa-solid fa-hospital me-1" style="color:#00b4ff;"></i>En Yakın Hastane
+                        </div>
+                        <div class="ai-block info"><p id="aiHospitalNote" class="small mb-0 text-muted-custom">—</p></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</section>
+
+<!-- Scripts -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="app.js"></script>
+<script src="sim.js"></script>
+<script>
+// Failsafe: always remove page loader after 2s even if other scripts fail
+setTimeout(function(){
+  var l=document.getElementById('pageLoader');
+  if(l) l.classList.add('loaded');
+},2000);
+</script>
+</body>
+</html>

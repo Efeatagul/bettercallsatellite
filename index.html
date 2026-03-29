@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="tr" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="AfetAI — A* algoritmasını topografik veriler ve anlık engel haritalarıyla hibrit hale getirerek rota hesaplama süresini 118ms altına indiren afet müdahale sistemi.">
+    <title>AfetAI — Yapay Zeka Destekli Afet Müdahale Sistemi</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@400;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- PAGE LOADER -->
+    <div class="page-loader" id="pageLoader">
+        <div class="loader-spinner"></div>
+        <div class="loader-text">Uydu bağlantısı kuruluyor...</div>
+    </div>
+
+    <!-- NAVBAR -->
+    <nav class="navbar navbar-expand-lg fixed-top glass-nav py-3" id="navbar">
+        <div class="container">
+            <a class="navbar-brand text-white" href="index.html">
+                <i class="fa-solid fa-satellite text-primary me-2"></i>AfetAI
+            </a>
+            <button class="navbar-toggler shadow-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav">
+                <i class="fa-solid fa-bars text-white fs-4"></i>
+            </button>
+            <div class="collapse navbar-collapse" id="mainNav">
+                <ul class="navbar-nav mx-auto mb-2 mb-lg-0 gap-lg-3">
+                    <li class="nav-item"><a class="nav-link" href="index.html">Ana Sayfa</a></li>
+                    <li class="nav-item"><a class="nav-link" href="ozet.html">Özet</a></li>
+                    <li class="nav-item"><a class="nav-link" href="girdiler.html">Girdiler</a></li>
+                    <li class="nav-item"><a class="nav-link" href="cozum.html">Çözüm</a></li>
+                    <li class="nav-item"><a class="nav-link" href="teknoloji.html">Teknoloji</a></li>
+                    <li class="nav-item"><a class="nav-link" href="simulasyon.html">Afet Paneli</a></li>
+                </ul>
+                <a href="simulasyon.html" class="btn btn-primary-custom rounded-pill mt-3 mt-lg-0">
+                    <i class="fa-solid fa-play me-1"></i> Afet Panelini Aç
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- HERO -->
+    <section class="hero-wrapper">
+        <div class="floating-orb orb-1"></div>
+        <div class="floating-orb orb-2"></div>
+        <div class="hero-bg">
+            <canvas id="hero-canvas"></canvas>
+            <div class="hero-overlay"></div>
+        </div>
+
+        <div class="container z-1">
+            <div class="row min-vh-100 align-items-center">
+                <div class="col-lg-8 mx-auto text-center" data-aos="zoom-in" data-aos-duration="1000">
+                    <div class="d-inline-flex align-items-center px-3 py-2 rounded-pill mb-4" style="background: rgba(0,212,255,0.08); border: 1px solid rgba(0,212,255,0.2);">
+                        <span class="spinner-grow spinner-grow-sm text-primary me-2" role="status"></span>
+                        <span class="text-primary fw-medium small" style="letter-spacing: 1.5px;">SENTINEL-2 VERİ AKIŞI AKTİF</span>
+                    </div>
+
+                    <h1 class="display-3 fw-bold mb-4">
+                        Yapay Zeka ile<br>
+                        <span class="text-gradient" id="typewriter"></span>
+                        <span class="d-inline-block border-end border-2 border-primary" style="animation: blink 0.8s step-end infinite; height: 0.9em; vertical-align: middle;"></span>
+                    </h1>
+
+                    <p class="lead text-muted-custom mb-5 px-lg-5">
+                        6 Şubat Hatay depremi sonrası geliştirilen bu sistem, Sentinel-2 multispektral ve SAR verilerini U-Net segmentasyon modeliyle işleyerek hasar haritası çıkarır. A* algoritmasını topografik engel verileriyle birleştirerek rota hesaplama süresini <strong class="text-white">118ms</strong> altına indirdik.
+                    </p>
+
+                    <div class="d-flex flex-column flex-sm-row justify-content-center gap-3 mb-5">
+                        <a href="teknoloji.html#demo" class="btn btn-primary-custom btn-lg rounded-pill px-5">
+                            <i class="fa-solid fa-map-location-dot me-2"></i> Afet Panelini Aç
+                        </a>
+                        <a href="ozet.html" class="btn btn-outline-custom btn-lg rounded-pill px-5">
+                            <i class="fa-solid fa-diagram-project me-2"></i> Sistem Özeti
+                        </a>
+                    </div>
+
+                    <!-- Mini stats -->
+                    <div class="row g-3 justify-content-center" data-aos="fade-up" data-aos-delay="200">
+                        <div class="col-auto">
+                            <span class="stat-chip" style="background: rgba(0,212,255,0.1); color: var(--color-primary);">
+                                <i class="fa-solid fa-database"></i> 4.2 GB/sn veri işleme
+                            </span>
+                        </div>
+                        <div class="col-auto">
+                            <span class="stat-chip" style="background: rgba(0,255,136,0.1); color: var(--color-success);">
+                                <i class="fa-solid fa-bullseye"></i> F1-Score: %94.2
+                            </span>
+                        </div>
+                        <div class="col-auto">
+                            <span class="stat-chip" style="background: rgba(168,85,247,0.1); color: var(--color-purple);">
+                                <i class="fa-solid fa-clock"></i> Rota: &lt;118ms
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <style>@keyframes blink { 50% { opacity: 0; } }</style>
+
+    <!-- FOOTER -->
+    <footer class="py-5 border-top border-secondary">
+        <div class="container">
+            <div class="row gy-4">
+                <div class="col-lg-5">
+                    <h5 class="fw-bold mb-3"><i class="fa-solid fa-satellite text-primary"></i> AfetAI</h5>
+                    <p class="text-muted-custom small">6 Şubat sonrası başlayan, uydu verisi ve yapay zekayı birleştirerek kurtarma operasyonlarında karar destek sağlayan açık kaynaklı proje. Sentinel-2 API, PyTorch ve PostGIS altyapısı üzerine inşa edilmiştir.</p>
+                </div>
+                <div class="col-lg-7">
+                    <div class="row">
+                        <div class="col-6 col-sm-4">
+                            <h6 class="fw-bold text-white mb-3">Sayfalar</h6>
+                            <ul class="list-unstyled d-flex flex-column gap-2">
+                                <li><a href="index.html" class="footer-link">Ana Sayfa</a></li>
+                                <li><a href="ozet.html" class="footer-link">Özet</a></li>
+                                <li><a href="girdiler.html" class="footer-link">Girdiler</a></li>
+                            </ul>
+                        </div>
+                        <div class="col-6 col-sm-4">
+                            <h6 class="fw-bold text-white mb-3">Teknik</h6>
+                            <ul class="list-unstyled d-flex flex-column gap-2">
+                                <li><a href="cozum.html" class="footer-link">Çözüm</a></li>
+                                <li><a href="teknoloji.html" class="footer-link">Teknoloji</a></li>
+                                <li><a href="teknoloji.html#demo" class="footer-link">Demo</a></li>
+                            </ul>
+                        </div>
+                        <div class="col-sm-4 mt-3 mt-sm-0">
+                            <h6 class="fw-bold text-white mb-3">Stack</h6>
+                            <ul class="list-unstyled d-flex flex-column gap-2 text-muted-custom small">
+                                <li>PyTorch 2.1</li>
+                                <li>PostGIS 3.4</li>
+                                <li>Sentinel-2 L2A</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="border-top border-secondary mt-4 pt-4 d-flex flex-wrap justify-content-between text-muted-custom small">
+                <span>© 2026 AfetAI — Açık kaynak proje</span>
+                <span class="font-monospace">v2.4.1-beta</span>
+            </div>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

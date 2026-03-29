@@ -1,0 +1,38 @@
+=============================================
+  AfetAI — Uygulama Başlatma Komutları
+=============================================
+
+--------------------------------------------
+1. BACKEND (AI sunucu) — Terminal 1
+--------------------------------------------
+cd "/Users/efeaydin/Downloads/Fronted 2" && python3 server.py
+
+Sunucu http://localhost:5050 adresinde başlar.
+AI modeli olmadan da çalışır (algoritmik fallback).
+
+--------------------------------------------
+2. FRONTEND (HTTP sunucu) — Terminal 2
+--------------------------------------------
+cd "/Users/efeaydin/Downloads/Fronted 2" && python3 -m http.server 8080
+
+Ardından tarayıcıda aç:
+  http://localhost:8080/simulasyon.html
+
+--------------------------------------------
+TEK KOMUTLA (arka planda her ikisi birden)
+--------------------------------------------
+cd "/Users/efeaydin/Downloads/Fronted 2" && python3 server.py & python3 -m http.server 8080
+
+Tarayıcıda aç:
+  http://localhost:8080/simulasyon.html
+
+--------------------------------------------
+DURDURMA
+--------------------------------------------
+Ctrl+C  (her terminal için)
+
+veya tüm arka plan süreçleri öldür:
+  kill $(lsof -ti:5050) 2>/dev/null
+  kill $(lsof -ti:8080) 2>/dev/null
+
+=============================================

@@ -1,0 +1,349 @@
+═══════════════════════════════════════════════════════════════════════
+  AfetAI — Deprem Afet Yönetimi ve AI Rota Analiz Sistemi
+  Versiyon: 4.0  |  Dil: Türkçe  |  Platform: macOS (Apple Silicon)
+═══════════════════════════════════════════════════════════════════════
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  NE YAPAR?
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+AfetAI, gerçek zamanlı deprem verilerini kullanarak:
+
+  1. Dünya genelindeki güncel depremleri harita üzerinde gösterir
+  2. Seçilen deprem bölgesinde yakın toplanma alanlarını tespit eder
+  3. Yapay zeka ile en güvenli toplanma alanını seçer
+  4. Kullanıcı konumundan seçilen alana gerçek yol ağı üzerinden
+     rota hesaplar ve 3 boyutlu (XYZ koordinatlı) olarak gösterir
+  5. AFAD istasyonları ve hastanelerden toplanma alanlarına ayrı
+     renk kodlu rotalar çizer
+  6. NASA FIRMS uydu verisiyle gerçek yangın noktalarını gösterir
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TEMEL ÖZELLİKLER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. GERÇEK ZAMANLI DEPREM LİSTESİ
+   ─────────────────────────────
+   • Kaynak: USGS FDSN API (earthquake.usgs.gov)
+   • Kapsam: Türkiye ve çevresi (35.5–42.5°N, 25.5–45.5°E)
+   • Filtre: Son 60 gün, M2.5 ve üzeri
+   • Limit: 500 deprem, büyüklüğe göre azalan sıralı
+   • Her 5 dakikada bir otomatik güncelleme
+   • Büyüklüğe göre renk kodu (sarı → turuncu → kırmızı)
+   • Listeden bir depreme tıklanınca harita o bölgeye uçar,
+     hasar alanı hesaplanır ve toplanma noktaları yüklenir
+
+2. TOPLANMA ALANI TESPİTİ
+   ───────────────────────
+   • Birincil kaynak: OpenStreetMap Overpass API
+     - 10 km yarıçapta tarama (boşsa 25 km'ye genişler)
+     - Resmi toplanma noktaları, parklar, stadyumlar, okullar,
+       üniversiteler, spor sahaları
+     - Sonuçlar kullanıcıya olan mesafeye göre sıralanır
+     - En yakındakiler önce gösterilir
+   • İkincil kaynak: Statik el verilmiş veri tabanı
+     - 28 doğrulanmış toplanma alanı (İskenderun, Antakya, Defne,
+       Adana, Gaziantep, İstanbul Kadıköy/Beşiktaş/Küçükçekmece)
+     - Mahalle düzeyinde doğrulanmış GPS koordinatları
+   • Hasar hesabı: Episantr mesafesine göre her alana
+     0.0–1.0 arası hasar skoru atanır (Atkinson-Silva modeli)
+
+3. AI ROTA ANALİZİ (Qwen2.5-VL-7B)
+   ─────────────────────────────────
+   • Harita görüntüsü yakalanır (hasar bölgeleri + AP ikonları)
+   • Görüntü yerel MLX sunucusuna (localhost:5050) gönderilir
+   • Model hasar haritasını görsel olarak analiz eder
+   • "route_to_assembly_point" tool call ile en güvenli alanı seçer
+   • Seçim gerekçesi, risk değerlendirmesi ve rota notları döner
+   • Sunucu kapalıysa JS algoritmik fallback devreye girer:
+     mesafe + hasar skoru kombinasyonuyla en iyi alanı hesaplar
+
+4. GERÇEK YOL AĞINDA ROTA HESAPLAMA
+   ──────────────────────────────────
+   • Birincil: OSRM (Open Source Routing Machine) — yaya profili
+     - İki endpoint paralel denenir (en hızlı cevap kullanılır)
+     - router.project-osrm.org
+     - routing.openstreetmap.de
+   • İkincil: Valhalla (OSM Community) — OSRM başarısız olursa
+     - valhalla1.openstreetmap.de (yaya profili)
+     - Precision=6 polyline decode desteği
+   • Üçüncül: Backend /api/route (sunucu-taraflı OSRM çağrısı)
+   • Son çare: Düz hat (tüm routing servisleri kapalıysa)
+   • Rota noktaları gerçek OSM yol geometrisini takip eder
+
+5. 3 BOYUTLU ROTA (XYZ KOORDİNATLARI)
+   ─────────────────────────────────────
+   • X = Boylam (°E) — OpenStreetMap
+   • Y = Enlem (°N) — OpenStreetMap
+   • Z = İrtifa (m) — Open-Elevation API (SRTM 30m çözünürlük)
+   • Her waypoint etiketi harita üzerinde X°, Y°, Zm olarak gösterilir
+   • Waypoint tablosu sağ panelde listelenir
+
+6. RENK KODLU ÇOK ROTA SİSTEMİ
+   ──────────────────────────────
+   Haritada aynı anda 3 farklı birim için farklı renklerde
+   rotalar çizilir:
+
+   [Kullanıcı → Toplanma Alanları]
+   Her toplanma alanı için farklı renk:
+     - Sağlam alanlar: Cyan, yeşil, mor, sarı, zümrüt... (sıralı palet)
+     - Orta hasarlı:   Sarı/turuncu
+     - Ağır hasarlı:   Kırmızı
+   Kesik çizgi, %45–75 opaklık, glow efekti
+
+   [AFAD İstasyonları → Toplanma Alanları]
+   Renk: Turuncu (#ff7f00)
+   Kesik çizgi (7px-4px aralık), tooltip: istasyon adı → hedef alan
+
+   [Hastaneler → Toplanma Alanları]
+   Renk: Kırmızı/Crimson (#dc143c)
+   Noktalı çizgi (4px-6px aralık), tooltip: hastane adı → hedef alan
+
+7. STATIK AFAD VE HASTANE VERİ TABANI
+   ─────────────────────────────────────
+   20 il için mahalle/cadde düzeyinde doğrulanmış koordinatlar:
+
+   AFAD İstasyonları (20 adet):
+   İstanbul (Eyüpsultan/Hasdal), Ankara (Çankaya/Dumlupınar Blv.),
+   İzmir (Bornova/Kemalpaşa Cd.), Antalya (Döşemealtı/Akdeniz Blv.),
+   Adana (Çukurova/Güzelyalı Mah.), Konya (Selçuklu/Horozluhan Mah.),
+   Gaziantep (Şehitkamil/Osmangazi Mah.), Şanlıurfa (Karaköprü/GAP Blv.),
+   Kocaeli (İzmit/Yahyakaptan Mah.), Mersin (Yenişehir/Çiftlikköy Mah.),
+   Diyarbakır (Kayapınar/Talaytepe Mah.), Kayseri (Kocasinan/Sümer Mah.),
+   Samsun (Atakum/Körfez Mah.), Balıkesir (Altıeylül/Gümüşçeşme Mah.),
+   Kahramanmaraş (Dulkadiroğlu/Karacasu Karaziyaret Mah.),
+   Van (Edremit/İpekyolu Cd.), Aydın (Efeler/Zeybek Mah.),
+   Denizli (Merkezefendi/Şirinköy Mah.), Sakarya (Adapazarı/Camili Mah.),
+   Hatay (Serinyol/Antakya-İskenderun Yolu)
+
+   Hastaneler (20 adet):
+   İstanbul (Çam ve Sakura Şehir Hastanesi, Başakşehir),
+   Ankara (Bilkent Şehir Hastanesi, Çankaya),
+   İzmir (İzmir Şehir Hastanesi, Bayraklı/Lakerda Sk.),
+   Antalya (EAH, Muratpaşa/Kazım Karabekir Cd.),
+   Adana (Şehir Hastanesi, Yüreğir/Dr. Mithat Özsan Blv.),
+   Konya (Şehir Hastanesi, Karatay/Cemil Çiçek Cd.),
+   Gaziantep (Şehir Hastanesi, Şahinbey/İbni Sina Mah.),
+   Şanlıurfa (Mehmet Akif İnan EAH, Haliliye/Ertuğrul Gazi Cd.),
+   Kocaeli (Şehir Hastanesi, İzmit/Cephanelik Mevkii),
+   Mersin (Şehir Hastanesi, Toroslar/Korukent Mah.),
+   Diyarbakır (Gazi Yaşargil EAH, Kayapınar/Üçkuyular Mah.),
+   Kayseri (Şehir Hastanesi, Kocasinan/Muhsin Yazıcıoğlu Blv.),
+   Samsun (EAH, İlkadım/Barış Blv. Kadıköy Mah.),
+   Balıkesir (Atatürk Şehir Hastanesi, Altıeylül/Soma Cd.),
+   Kahramanmaraş (Necip Fazıl Şehir Hastanesi, Dulkadiroğlu),
+   Van (Bölge EAH, Edremit/Süphan Mah. İpekyolu Cd.),
+   Aydın (Devlet Hastanesi, Efeler/Hasanefendi Mah. İstiklal Cd.),
+   Denizli (Devlet Hastanesi, Merkezefendi/Şehit Albay Karaoğlanoğlu Cd.),
+   Sakarya (EAH, Adapazarı/Adnan Menderes Cd. No:195),
+   Hatay (EAH, Güzelburç Mah., Antakya)
+
+8. DOĞRULANMIŞ TOPLANMA ALANLARI VERİ TABANI
+   ────────────────────────────────────────────
+   28 adet, mahalle/sokak düzeyinde koordinatlar:
+
+   İskenderun (7 alan):
+   - İskenderun Millet Parkı (İsmet İnönü Mah.)
+   - PAC Yeşil Alanı (Barbaros Mah.)
+   - 5 Temmuz Stadyumu (Pirireis Mah.)
+   - Eski Bit Pazarı Yeri (Çay Mah.)
+   - Tayfur Sökmen Blv. Parkı (Çay Mah.)
+   - Adnan Kahveci Çocuk Parkı (Fatih Sultan Mehmet Mah.)
+   - Piri Sultan Abdal Parkı (Numune Mah.)
+
+   Antakya (3 alan):
+   - Hatay Millet Bahçesi (General Şükrü Kanatlı Mah.)
+   - Semt Pazarı Alanı (Cumhuriyet Mah., 21. Sokak)
+   - Hastane Havuzlar Parkı (Fevzi Çakmak Mah., Hastane Havuzlar Cad.)
+
+   Defne (1 alan):
+   - Sevgi Parkı (Sümerler Mah.)
+
+   Adana (5 alan):
+   - Atatürk Parkı (Kurtuluş Mah., Atatürk Cad.–Ziyapaşa Blv.)
+   - Sabancı Doğal Parkı (100. Yıl Mah., Kaymakamlık Karşısı)
+   - Adana Lions Kulübü Parkı (Pınar Mah., 74103 Sokak)
+   - Akkapı 1 Nolu Park (Akkapı Mah., Şıh Cemil Cad. & 12113 Sk.)
+   - 2 Temmuz Çocuk Parkı (Küçükdikili Koza Mah.)
+
+   Gaziantep (3 alan):
+   - Hoşgör Meydan Parkı (Şahinbey, Kolejtepe Mah.)
+   - Vadi Allaben Parkı (Şahinbey, Yamaçtepe Mah.)
+   - Seyrantepe Pazaryeri (Şehitkamil, Seyrantepe Mah.)
+
+   İstanbul — Kadıköy (4 alan):
+   - Koşuyolu Parkı (Koşuyolu Mah., Mühittin Üstündağ Sok.)
+   - Kriton Curi Parkı (19 Mayıs Mah.)
+   - Söğütlüçeşme Alanı (Zühtüpaşa Mah., Taşköprü Cad. çevresi)
+   - Göztepe Parkı (Caddebostan Mah., Bağdat Cad. üzeri)
+
+   İstanbul — Beşiktaş (3 alan):
+   - Abbasağa Parkı (Cihannüma Mah., Abbasağa Sok.)
+   - Dilek Sabancı Parkı (Levent Mah., Ülgen Sok.)
+   - Sanatçılar Parkı (Akat Mah., Tepecik Yolu Sok.)
+
+   İstanbul — Küçükçekmece (2 alan):
+   - Selçuklu Parkı (Atakent Mah., 2. ve 3. Kısım)
+   - 29 Ekim Cumhuriyet Parkı (Fevzi Çakmak Mah.)
+
+9. HASAR SİMÜLASYONU
+   ────────────────────
+   • Deprem başladığında şok dalgası animasyonu (canvas)
+   • Hasar yarıçapı = Büyüklük × 7 km (basitleştirilmiş model)
+   • Ağır hasar bölgesi = Yarıçapın %45'i
+   • Her toplanma alanına kırmızı/turuncu/sarı hasar göstergesi
+   • Hasar > %50 olan alanlar rota hesabından elenir
+
+10. NASA FIRMS YANGIN KATMANI
+    ──────────────────────────
+    • Kaynak: NASA FIRMS VIIRS NOAA-20 (24 saatlik aktif yangın)
+    • Haritaya sarı/kırmızı noktalar olarak işlenir
+    • NASA GIBS MODIS Terra ThermalAnomalies tile katmanı
+    • "Yangın Katmanı" butonu ile açılıp kapatılır
+    • 30 dakika cache (gereksiz API çağrısını önler)
+
+11. UYDU GÖRÜNTÜSÜ TARAMASI
+    ─────────────────────────
+    • Haritaya 3 kez art arda tıklanırsa o noktanın
+      uydu görüntüsü popup olarak açılır
+
+12. OTOMATİK ANALİZ KUYRUĞU
+    ──────────────────────────
+    • M4.6 ve üzeri tüm depremler büyüklüğe göre sıralı kuyruğa alınır
+    • Her 2 dakika 30 saniyede bir sıradaki deprem otomatik analiz edilir
+    • "İşle" butonu ile manuel tetikleme de mümkündür
+    • Geri sayım sayacı panelde görünür
+
+13. MODEL SEÇİCİ
+    ─────────────
+    Desteklenen MLX modelleri (Apple Silicon):
+    • mlx-community/Qwen2.5-VL-7B-Instruct-4bit  (~4.5 GB) — Önerilen
+    • mlx-community/Qwen2.5-VL-3B-Instruct-4bit  (~2.1 GB) — Hızlı
+    • mlx-community/Qwen2.5-VL-72B-Instruct-4bit (~40 GB)  — En yüksek doğruluk
+    • mlx-community/Phi-3.5-vision-instruct-4bit  (~2.4 GB) — Kompakt
+    • mlx-community/llava-1.5-7b-4bit             (~4.0 GB) — Klasik
+    • mlx-community/InternVL2-8B-4bit             (~4.8 GB) — Güçlü görüntü
+    Özel HuggingFace path ile herhangi bir model yüklenebilir.
+
+14. RAG VERİ HAVUZU
+    ─────────────────
+    • MongoDB veya in-memory cache (MongoDB yoksa)
+    • Overpass API'den 12 km yarıçapta otomatik seed
+    • Hastane, AFAD istasyonu, itfaiye verileri
+    • 24 saat cache, zorla yenileme butonu
+    • AI analizi sırasında model bu verileri de görür
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TEKNİK MİMARİ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+FRONTEND  (sim.js — ~3130 satır, vanilla JavaScript)
+  • Leaflet 1.9.4  — interaktif harita, zoom/pan, marker katmanları
+  • Canvas overlay — şok dalgası animasyonu, HUD
+  • Esri World Imagery — uydu görüntüsü (evler/sokaklar görünür)
+  • Bootstrap 5.3.3 — panel düzeni
+  • JetBrains Mono / Inter / Outfit — tipografi
+
+BACKEND  (server.py — ~1391 satır, Python/Flask)
+  • Flask + Flask-CORS
+  • MLX-VLM — Apple Silicon yerel model çalıştırıcı
+  • ThreadPoolExecutor — OSRM paralel sorgu
+  • MongoDB (isteğe bağlı) — RAG cache
+  • Open-Elevation — SRTM yükseklik verisi
+
+SAYFALAR
+  • index.html      — Ana sayfa / giriş
+  • ozet.html       — Sistem özeti ve grafikler
+  • girdiler.html   — Girdi/çıktı tanımları
+  • cozum.html      — Çözüm akışı
+  • teknoloji.html  — Tech stack ve A* demo
+  • simulasyon.html — Afet Paneli (ana uygulama)
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  KULLANINAN ÜCRETSİZ API'LER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  API                   Kullanım Amacı                   Limit
+  ─────────────────     ─────────────────────────────    ──────────────
+  USGS FDSN             Gerçek zamanlı deprem verisi      Ücretsiz
+  Nominatim (OSM)       Mahalle/şehir → koordinat         1 istek/sn
+  Overpass API          Toplanma alanı, AFAD, hastane     Ücretsiz
+  OSRM                  Yaya rota hesaplama               Ücretsiz
+  Valhalla (OSM)        Yaya rota (OSRM fallback)         Ücretsiz
+  Open-Elevation        Waypoint irtifa (SRTM 30m)        Ücretsiz
+  Esri World Imagery    Uydu harita tile'ları             Ücretsiz
+  NASA FIRMS/GIBS       Gerçek yangın noktaları           Ücretsiz
+  MongoDB               RAG cache (isteğe bağlı)          Yerel
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  SUNUCU OLMADAN ÇALIŞMA (FALLBACK ZİNCİRİ)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Her katmanda fallback mevcuttur; sistem hiçbir zaman tamamen durmaz:
+
+  Toplanma Alanı:
+    Overpass (10 km) → Overpass (25 km) → Statik DB → Simüle offset
+
+  Rota:
+    OSRM paralel (2 endpoint) → Valhalla → Backend /api/route → Düz hat
+
+  AI Analizi:
+    Qwen2.5-VL (MLX lokal) → JS Algoritmik Fallback (mesafe + hasar skoru)
+
+  AFAD/Hastane Verisi:
+    Backend RAG (MongoDB/Overpass) → Statik 20-il veri tabanı
+
+  İrtifa (Z):
+    Backend Open-Elevation → Frontend Open-Elevation → Lineer interpolasyon
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  KULLANIM AKIŞI
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  1. Sağ paneldeki "Son Depremler" listesinden bir depreme tıkla
+     VEYA arama kutusuna mahalle/şehir yaz ve Enter'a bas
+     VEYA haritaya tıklayarak manuel epimerkez seç
+
+  2. Harita deprem bölgesine uçar, şok dalgası animasyonu başlar,
+     yakın toplanma alanları OSM'den çekilir ve haritaya işlenir
+
+  3. Hasar bölgeleri renk kodlu olarak görünür (kırmızı/turuncu/sarı)
+     Tüm toplanma alanlarına kullanıcı konumundan rotalar çizilir
+     AFAD ve hastane rotaları aynı anda farklı renklerde görünür
+
+  4. "AI Analizi" butonuna bas
+     Model harita görüntüsünü analiz eder, en güvenli alanı seçer
+     Seçilen alana gerçek yol üzerinden 3B rota animasyonu başlar
+
+  5. Sağ panelde:
+     - Seçilen toplanma alanı ve seçim gerekçesi
+     - Risk değerlendirmesi
+     - Rota notları
+     - AFAD yönlendirmesi
+     - En yakın hastane bilgisi
+     - XYZ waypoint tablosu görünür
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  BAŞLATMA KOMUTLARI
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Terminal 1 — AI Backend:
+    cd "/Users/efeaydin/Downloads/Fronted 2" && python3 server.py
+
+  Terminal 2 — Web Sunucu:
+    cd "/Users/efeaydin/Downloads/Fronted 2" && python3 -m http.server 8080
+
+  Tarayıcıda aç:
+    http://localhost:8080/simulasyon.html
+
+  Tek komutla:
+    cd "/Users/efeaydin/Downloads/Fronted 2" && python3 server.py & python3 -m http.server 8080
+
+═══════════════════════════════════════════════════════════════════════
