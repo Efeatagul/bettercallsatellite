@@ -15,7 +15,7 @@ Afet durumlarında (deprem, sel, yangın vb.) yerdeki ulaşım ağları ciddi ha
 - **🔔 Kritik Bildirim Sistemi:** Saha ekiplerine anlık koordinat ve güvenli yol tariflerinin iletilmesi.
 - **🗺️ Operasyonel Dashboard:** Merkezi yönetim ve saha ekipleri için interaktif harita arayüzü.
 
----.
+---
 
 ## 🏗️ Sistem Mimarisi (Çalışma Mantığı)
 1. **Veri Girişi:** Yerli uydu portalından gelen ham/işlenmiş görüntülerin sisteme aktarılması.
